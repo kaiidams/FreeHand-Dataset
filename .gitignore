@@ -130,3 +130,6 @@ dmypy.json
 
 # Blender
 *.blend1
+
+# Local
+/images
