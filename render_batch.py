@@ -4,51 +4,113 @@
 import bpy
 import os
 import random
-import math
+from math import pi, cos, sin
 import numpy as np
 
 
-def randomize_pose():
+BONE_NAMES = (
+    'Camera',
+    'Camera',
+    'Camera',
+    'wrist.R', # hori
+    'wrist.R', # vert
+    'finger1.R',
+    'finger2-1.R',
+    'finger3-1.R',
+    'finger4-1.R',
+    'finger5-1.R',
+    )
+    
+BONE_MIN = np.array([
+    -30,
+    0,
+    0,
+    -10,
+    -30,
+    -5,
+    -5,
+    -5,
+    -5,    
+    -5
+    ])
+
+BONE_RAND_RANGE = np.array([
+    90,
+    360,
+    360,
+    -10,
+    30,
+    60,
+    60,
+    60,
+    60,    
+    60
+    ]) - BONE_MIN
+
+BONE_MAX = np.array([
+    90,
+    360,
+    360,
+    -10,
+    30,
+    40,
+    40,
+    40,
+    40,    
+    40
+    ])
+    
+
+def random_angles():
+    '''Returns random angles as a numpy array.'''
+    angles = np.random.random(len(BONE_NAMES)) * BONE_RAND_RANGE + BONE_MIN
+    for i in range(6, 9):
+        if random.random() < 0.3:
+            angles[i] = 0.0
+    if random.random() < 0.8:
+        # Outer fingers are easier to be flexed. 
+        angles[7] = max(angles[6], angles[7])
+        angles[8] = max(angles[7], angles[8])
+    angles[9] = angles[8] # ring and baby move together.
+    angles = np.minimum(angles, BONE_MAX)
+    return angles
+
+
+def apply_handpose(angles):
+    '''Applies angles to the hand bones.'''
     o = bpy.data.objects['Hand']
-    prev_angle = 0.0
-    for i in range(1, 6):
-        bone = o.pose.bones['finger{}-1.R'.format(i)]
-        if i == 5:
-            angle = prev_angle
-        else:
-            angle = random.uniform(-60, 60) * math.pi / 180
-            if i >= 3 and angle < prev_angle:
-                angle = prev_angle
-            elif angle < 0.0:
-                angle = 0.0
-            elif angle > 40 * math.pi / 180:
-                angle = 40 * math.pi / 180
-        bone.rotation_quaternion.x = angle
-        prev_angle = angle
+    for i in range(5, 10):
+        bonename = BONE_NAMES[i]
+        bone = o.pose.bones[bonename]
+        angle = angles[i]
+        bone.rotation_quaternion.x = angle * pi / 180
 
 
 def render_once(index):
-    randomize_pose()
+    
+    angles = random_angles()
+    print(angles)
+    apply_handpose(angles)
 
     scene = bpy.data.scenes['Scene']
     camera_object = bpy.data.objects['Camera']
     
-    elevation_angle = random.uniform(-30, 90) * math.pi / 180
-    azmith_angle = random.uniform(0, 360) * math.pi / 180
-    yaw_angle = random.uniform(0, 360) * math.pi / 180
+    elevation_angle = random.uniform(-30, 90) * pi / 180
+    azmith_angle = random.uniform(0, 360) * pi / 180
+    yaw_angle = random.uniform(0, 360) * pi / 180
     camera_distance = 1.0
     
     print([x for x in dir(camera_object) if 'rot' in x])
     print(camera_object.rotation_euler)
     
-    camera_object.rotation_euler.x = - elevation_angle + math.pi / 2
+    camera_object.rotation_euler.x = - elevation_angle + pi / 2
     camera_object.rotation_euler.y = 0 #yaw_angle
-    camera_object.rotation_euler.z = azmith_angle + math.pi / 2
+    camera_object.rotation_euler.z = azmith_angle + pi / 2
 
     camera_pos = (
-        camera_distance * math.cos(azmith_angle) * math.cos(elevation_angle),
-        camera_distance * math.sin(azmith_angle) * math.cos(elevation_angle),
-        camera_distance * math.sin(elevation_angle)
+        camera_distance * cos(azmith_angle) * cos(elevation_angle),
+        camera_distance * sin(azmith_angle) * cos(elevation_angle),
+        camera_distance * sin(elevation_angle)
         )
     camera_object.location.x = camera_pos[0]
     camera_object.location.y = camera_pos[1]
