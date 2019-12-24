@@ -29,7 +29,7 @@ def randomize_pose():
 
 def render_once(index):
     randomize_pose()
-    return
+
     scene = bpy.data.scenes['Scene']
     camera_object = bpy.data.objects['Camera']
     
@@ -61,6 +61,11 @@ def render_once(index):
     
     
 if __name__ == '__main__':
+    view_layer = bpy.context.view_layer
+    ob = bpy.data.objects['Hand']
+    ob.select_set(True)
+    view_layer.objects.active = ob
+    # bpy.context.scene.objects.active = ob # 2.7x
     bpy.ops.object.mode_set(mode='POSE')
     for i in range(10):
         render_once(i)
