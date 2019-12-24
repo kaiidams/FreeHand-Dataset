@@ -7,7 +7,29 @@ import random
 import math
 import numpy as np
 
+
+def randomize_pose():
+    o = bpy.data.objects['Hand']
+    prev_angle = 0.0
+    for i in range(1, 6):
+        bone = o.pose.bones['finger{}-1.R'.format(i)]
+        if i == 5:
+            angle = prev_angle
+        else:
+            angle = random.uniform(-60, 60) * math.pi / 180
+            if i >= 3 and angle < prev_angle:
+                angle = prev_angle
+            elif angle < 0.0:
+                angle = 0.0
+            elif angle > 40 * math.pi / 180:
+                angle = 40 * math.pi / 180
+        bone.rotation_quaternion.x = angle
+        prev_angle = angle
+
+
 def render_once(index):
+    randomize_pose()
+    return
     scene = bpy.data.scenes['Scene']
     camera_object = bpy.data.objects['Camera']
     
@@ -39,5 +61,6 @@ def render_once(index):
     
     
 if __name__ == '__main__':
+    bpy.ops.object.mode_set(mode='POSE')
     for i in range(10):
         render_once(i)
