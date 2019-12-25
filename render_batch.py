@@ -111,17 +111,63 @@ def apply_camerapose(angles):
     
 
 def apply_lights():
+    """Changes lights strength."""
     for i in range(1, 6):
         ob = bpy.data.objects['Light{}'.format(i)]
         print(ob.data.energy)
         if random.random() < 0.3:
             ob.data.energy = 0.0
         else:
-            ob.data.energy = random.random() * 40
-    
+            ob.data.energy = random.random() * 40.0
+
+
+def get_render_pos(mat, pos):
+    p = mat @ pos
+    vx = p.x / -p.z * 3.888
+    vy = p.y / -p.z * 3.888
+    return vx, vy
+
+
+BBOX_BONE_NAMES = (['wrist.R'] + 
+    ['finger{}-{}.R'.format(i, j)
+     for i in range(1, 6)
+     for j in (1, 3)
+    ])
+
+def get_bounding_box(image_width, image_height):
+    min_vx, min_vy, max_vx, max_vy = 1.0, 1.0, -1.0, -1.0
+    ob = bpy.data.objects['Camera']
+    mat = ob.matrix_world.normalized().inverted()
+    ob = bpy.data.objects['Hand']
+    for bonename in BBOX_BONE_NAMES:
+        bone = ob.pose.bones[bonename]
+        vx, vy = get_render_pos(mat, bone.head)
+        if min_vx > vx:
+            min_vx = vx
+        if max_vx < vx:
+            max_vx = vx
+        if min_vy > vy:
+            min_vy = vy
+        if max_vy < vy:
+            max_vy = vy
+        vx, vy = get_render_pos(mat, bone.tail)
+        if min_vx > vx:
+            min_vx = vx
+        if max_vx < vx:
+            max_vx = vx
+        if min_vy > vy:
+            min_vy = vy
+        if max_vy < vy:
+            max_vy = vy
+    return (
+        (min_vx + 0.5) * image_width,
+        (min_vy + 0.5) * image_height,
+        (max_vx + 0.5) * image_width,
+        (max_vy + 0.5) * image_height
+        )
+        
 
 def render_scene(index):
-    scene = bpy.data.scenes['Scene']
     fname = '{0:05d}.png'.format(index)
     bpy.context.scene.render.filepath = os.path.join(os.getcwd(), 'images', fname)
     bpy.ops.render.render(write_still=True)
@@ -133,7 +179,14 @@ def process_once(index):
     apply_handpose(angles)
     apply_camerapose(angles)
     apply_lights()
-    render_scene(index)
+    dg = bpy.context.evaluated_depsgraph_get()
+    dg.update() 
+    #scene = bpy.data.scenes['Scene']
+    #scene.update() # 2.7x
+    image_width, image_height = 100, 100
+    bbox = get_bounding_box(image_width, image_height)
+    print(bbox)
+    #render_scene(index)
     
     
 def main():
