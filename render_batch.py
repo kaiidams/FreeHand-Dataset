@@ -2,6 +2,8 @@
 # See LICENSE file in the project root for full license information.
 
 import bpy
+import mathutils
+
 import os
 import random
 from math import pi, cos, sin
@@ -9,9 +11,9 @@ import numpy as np
 
 
 BONE_NAMES = (
+    'Camera',  # roll
     'Camera',  # elevation
     'Camera',  # azmith
-    'Camera',  # roll
     'wrist.R', # hori
     'wrist.R', # vert
     'finger1.R',
@@ -99,25 +101,13 @@ def apply_handpose(angles):
             bone.rotation_quaternion.x = angle * pi / 180
 
 
-def apply_camerapose(angles, camera_distance=1.0):
-    camera_object = bpy.data.objects['Camera']
-
-    elevation_angle = angles[0] * pi / 180
-    azmith_angle = angles[1] * pi / 180
-    roll_angle = angles[2] * pi / 180
-    
-    camera_object.rotation_euler.x = -elevation_angle + pi / 2
-    camera_object.rotation_euler.y = 0.0
-    camera_object.rotation_euler.z = azmith_angle + pi / 2
-
-    camera_pos = (
-        camera_distance * cos(azmith_angle) * cos(elevation_angle),
-        camera_distance * sin(azmith_angle) * cos(elevation_angle),
-        camera_distance * sin(elevation_angle) + 0.07
-        )
-    camera_object.location.x = camera_pos[0]
-    camera_object.location.y = camera_pos[1]
-    camera_object.location.z = camera_pos[2]
+def apply_camerapose(angles):
+    '''Rotate the camera bone to move the camera.'''
+    ob = bpy.data.objects['Hand']
+    bone = ob.pose.bones['camera']
+    bone.rotation_euler.x = angles[0] * pi / 180
+    bone.rotation_euler.y = angles[1] * pi / 180
+    bone.rotation_euler.z = angles[2] * pi / 180
     
 
 def apply_lights():
