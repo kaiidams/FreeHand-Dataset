@@ -121,7 +121,13 @@ def apply_camerapose(angles, camera_distance=1.0):
     
 
 def apply_lights():
-    ob = bpy.data.objects['Hand']
+    for i in range(1, 6):
+        ob = bpy.data.objects['Light{}'.format(i)]
+        print(ob.data.energy)
+        if random.random() < 0.3:
+            ob.data.energy = 0.0
+        else:
+            ob.data.energy = random.random() * 40
     
 
 def render_scene(index):
@@ -137,7 +143,7 @@ def process_once(index):
     apply_handpose(angles)
     apply_camerapose(angles)
     apply_lights()
-    #render_scene(index)
+    render_scene(index)
     
     
 def main():
