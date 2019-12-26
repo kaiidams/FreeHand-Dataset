@@ -6,6 +6,7 @@ import mathutils
 
 import os
 import random
+import json
 from math import pi, cos, sin
 import numpy as np
 
@@ -63,6 +64,13 @@ BONE_MAX = np.array([
     ])
     
 
+BBOX_BONE_NAMES = (['wrist.R'] + 
+    ['finger{}-{}.R'.format(i, j)
+     for i in range(1, 6)
+     for j in (1, 3)
+    ])
+    
+    
 def setup():
     '''Changes to the POSE mode.'''
     view_layer = bpy.context.view_layer
@@ -114,7 +122,6 @@ def apply_lights():
     """Changes lights strength."""
     for i in range(1, 6):
         ob = bpy.data.objects['Light{}'.format(i)]
-        print(ob.data.energy)
         if random.random() < 0.3:
             ob.data.energy = 0.0
         else:
@@ -128,71 +135,94 @@ def get_render_pos(mat, pos):
     return vx, vy
 
 
-BBOX_BONE_NAMES = (['wrist.R'] + 
-    ['finger{}-{}.R'.format(i, j)
-     for i in range(1, 6)
-     for j in (1, 3)
-    ])
-
 def get_bounding_box(image_width, image_height):
+    """Returns the bounding box of the hand in the image coordinate."""
     min_vx, min_vy, max_vx, max_vy = 1.0, 1.0, -1.0, -1.0
     ob = bpy.data.objects['Camera']
     mat = ob.matrix_world.normalized().inverted()
     ob = bpy.data.objects['Hand']
+
     for bonename in BBOX_BONE_NAMES:
         bone = ob.pose.bones[bonename]
-        vx, vy = get_render_pos(mat, bone.head)
-        if min_vx > vx:
-            min_vx = vx
-        if max_vx < vx:
-            max_vx = vx
-        if min_vy > vy:
-            min_vy = vy
-        if max_vy < vy:
-            max_vy = vy
-        vx, vy = get_render_pos(mat, bone.tail)
-        if min_vx > vx:
-            min_vx = vx
-        if max_vx < vx:
-            max_vx = vx
-        if min_vy > vy:
-            min_vy = vy
-        if max_vy < vy:
-            max_vy = vy
-    return (
-        (min_vx + 0.5) * image_width,
-        (min_vy + 0.5) * image_height,
-        (max_vx + 0.5) * image_width,
-        (max_vy + 0.5) * image_height
-        )
+        for pt in (bone.head, bone.tail):
+            vx, vy = get_render_pos(mat, pt)
+            if min_vx > vx:
+                min_vx = vx
+            if max_vx < vx:
+                max_vx = vx
+            if min_vy > vy:
+                min_vy = vy
+            if max_vy < vy:
+                max_vy = vy
+
+    # Translate to the image coordinate.
+    min_x = round((min_vx + 0.5) * image_width)
+    min_y = round((min_vy + 0.5) * image_height)
+    max_x = round((max_vx + 0.5) * image_width)
+    max_y = round((max_vy + 0.5) * image_height)
+    return min_x, min_y, max_x - min_x, max_y - min_y
         
 
-def render_scene(index):
-    fname = '{0:05d}.png'.format(index)
-    bpy.context.scene.render.filepath = os.path.join(os.getcwd(), 'images', fname)
+def render_scene(dirpath, filename):
+    bpy.context.scene.render.filepath = os.path.join(dirpath, filename)
     bpy.ops.render.render(write_still=True)
 
 
-def process_once(index):
-    print('Processing scene {}'.format(index))
+def process_once(dirpath, filename, annotations):
     angles = random_angles()
     apply_handpose(angles)
     apply_camerapose(angles)
     apply_lights()
-    dg = bpy.context.evaluated_depsgraph_get()
-    dg.update() 
+    render_scene(dirpath, filename)
+    #dg = bpy.context.evaluated_depsgraph_get()
+    #dg.update() 
     #scene = bpy.data.scenes['Scene']
     #scene.update() # 2.7x
-    image_width, image_height = 100, 100
+    image_width = bpy.context.scene.render.resolution_x
+    image_height = bpy.context.scene.render.resolution_y
     bbox = get_bounding_box(image_width, image_height)
-    print(bbox)
-    #render_scene(index)
-    
-    
-def main():
+    anno = {
+        'file_name': filename,
+        'pose': list(angles),
+        'bbox': bbox
+        }
+    annotations.append(anno)
+
+
+def write_annotations(annotations, dirpath, filename):
+    with open(os.path.join(dirpath, filename), 'w') as f:
+        for anno in annotations:
+            line = json.dumps(anno)
+            f.write(line + '\n')
+        
+        
+def main(mode='test'):
     setup()
-    for i in range(10):
-        process_once(i)
+
+    if mode == 'test':
+        num_blocks = 2
+        num_images_per_block = 10
+    else:
+        num_blocks = 100
+        num_images_per_block = 1000
+        
+    annotations_dirpath = os.path.join(os.getcwd(), 'data', 'annotations')
+    if not os.path.exists(annotations_dirpath):
+        os.makedirs(annotations_dirpath)
+
+    for i in range(num_blocks):
+        annotations = []
+
+        image_dirpath = os.path.join(os.getcwd(), 'data', 'images', '{:04d}'.format(i))
+        if not os.path.exists(image_dirpath):
+            os.makedirs(image_dirpath)
+
+        for j in range(num_images_per_block):
+            image_filename = '{:04d}-{:04d}.png'.format(i, j)
+            process_once(image_dirpath, image_filename, annotations)
+
+        annotations_filename = '{:04d}.json'.format(i)
+        write_annotations(annotations, annotations_dirpath, annotations_filename)
 
         
 if __name__ == '__main__':

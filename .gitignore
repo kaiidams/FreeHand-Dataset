@@ -132,4 +132,4 @@ dmypy.json
 *.blend1
 
 # Local
-/images
+/data/
