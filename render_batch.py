@@ -38,19 +38,6 @@ BONE_MIN = np.array([
     -5
     ])
 
-BONE_RAND_RANGE = np.array([
-    90,
-    360,
-    360,
-    10,
-    30,
-    60,
-    60,
-    60,
-    60,    
-    60
-    ]) - BONE_MIN
-
 BONE_MAX = np.array([
     90,
     360,
@@ -64,6 +51,7 @@ BONE_MAX = np.array([
     40
     ])
     
+BONE_RAND_RANGE = BONE_MAX - BONE_MIN
 
 BBOX_BONE_NAMES = (['wrist.R'] + 
     ['finger{}-{}.R'.format(i, j)
@@ -86,14 +74,16 @@ def random_angles():
     '''Returns random angles as a numpy array.'''
     angles = np.random.random(len(BONE_NAMES)) * BONE_RAND_RANGE + BONE_MIN
     for i in range(6, 9):
-        if random.random() < 0.3:
+        t = random.random()
+        if t < 0.4:
             angles[i] = 0.0
+        elif t < 0.6:
+            angles[i] = BONE_MAX[i]
     if random.random() < 0.8:
         # Outer fingers are easier to be flexed. 
         angles[7] = max(angles[6], angles[7])
         angles[8] = max(angles[7], angles[8])
     angles[9] = angles[8] # ring and baby move together.
-    angles = np.minimum(angles, BONE_MAX)
     return angles
 
 
@@ -126,7 +116,7 @@ def apply_lights():
         if random.random() < 0.3:
             ob.data.energy = 0.0
         else:
-            ob.data.energy = random.random() * 40.0
+            ob.data.energy = random.random() * 60.0
 
 
 def get_render_pos(mat, pos):
@@ -204,25 +194,25 @@ def main(mode='test'):
         num_blocks = 2
         num_images_per_block = 10
     else:
-        num_blocks = 100
+        num_blocks = 60
         num_images_per_block = 1000
         
-    annotations_dirpath = os.path.join(os.getcwd(), 'data', 'annotations')
+    annotations_dirpath = bpy.path.abspath('//data/annotations')
     if not os.path.exists(annotations_dirpath):
         os.makedirs(annotations_dirpath)
 
     for i in range(num_blocks):
         annotations = []
 
-        image_dirpath = os.path.join(os.getcwd(), 'data', 'images', '{:04d}'.format(i))
+        image_dirpath = bpy.path.abspath('//data/images/{:02d}'.format(i))
         if not os.path.exists(image_dirpath):
             os.makedirs(image_dirpath)
 
         for j in range(num_images_per_block):
-            image_filename = '{:04d}-{:04d}.png'.format(i, j)
+            image_filename = '{:02d}-{:03d}.png'.format(i, j)
             process_once(image_dirpath, image_filename, annotations)
 
-        annotations_filename = '{:04d}.json'.format(i)
+        annotations_filename = '{:02d}.json'.format(i)
         write_annotations(annotations, annotations_dirpath, annotations_filename)
 
         
