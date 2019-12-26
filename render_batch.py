@@ -4,6 +4,7 @@
 import bpy
 import mathutils
 
+import sys
 import os
 import random
 import json
@@ -226,4 +227,6 @@ def main(mode='test'):
 
         
 if __name__ == '__main__':
-    main()
+    mode = 'full' if '--full' in sys.argv[1:] else 'test'
+    print('Mode is {}'.format(mode))
+    main(mode=mode)
