@@ -34,7 +34,7 @@ BONE_MIN = np.array([
     -5,
     -5,
     -5,
-    -5,    
+    -5,
     -5
     ])
 
@@ -47,10 +47,10 @@ BONE_MAX = np.array([
     40,
     40,
     40,
-    40,    
+    40,
     40
     ])
-    
+
 BONE_RAND_RANGE = BONE_MAX - BONE_MIN
 
 BBOX_BONE_NAMES = (['wrist.R'] + 

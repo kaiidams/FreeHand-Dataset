@@ -10,15 +10,25 @@ import pickle
 import json
 
 
+OUTPUT_DIR = 'freehand-batches-py'
+
 def read_cifer(block):
-    with open('cifar-10-batches-py/data_batch_{}'.format(block), 'rb') as f:
+    if block == 6:
+        filename = 'test_batch'
+    else:
+        filename = 'data_batch_{}'.format(block)
+    with open('cifar-10-batches-py/' + filename, 'rb') as f:
         return pickle.load(f, encoding='bytes')
 
 
 def write_freehand_data(block, data):
-    if not os.path.exists('freehand-batches-py'):
-        os.makedirs('freehand-batches-py')
-    with open('freehand-batches-py/data_batch_{}'.format(block), 'wb') as f:
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+    if block == 6:
+        filename = 'test_batch'
+    else:
+        filename = 'data_batch_{}'.format(block)
+    with open(OUTPUT_DIR + '/' + filename, 'wb') as f:
         return pickle.dump(data, f)
 
 
@@ -83,6 +93,12 @@ def make_image(cifer_data, cifer_index, annotations, hand_block, hand_index):
     return image_to_array(im)
 
 
+def write_readme():
+    s = '<meta HTTP-EQUIV="REFRESH" content="0; url=https://github.com/kaiidams/FreeHand-Dataset">'
+    with open(os.path.join(OUTPUT_DIR, 'readme.html'), 'w') as f:
+        f.write(s + '\n')
+
+
 def main(num_cifer_blocks=6, num_hand_blocks_per_cifer_block=10, num_hand_indices_per_block=1000):
 
     for i in range(num_cifer_blocks):
@@ -103,7 +119,9 @@ def main(num_cifer_blocks=6, num_hand_blocks_per_cifer_block=10, num_hand_indice
         cifer_data[b'labels'] = labels
         cifer_data[b'filenames'] = []
         write_freehand_data(cifer_block, cifer_data)
+    write_readme()
 
 
 if __name__ == '__main__':
-    main(num_cifer_blocks=2, num_hand_blocks_per_cifer_block=1, num_hand_indices_per_block=10)
+    #main(num_cifer_blocks=2, num_hand_blocks_per_cifer_block=1, num_hand_indices_per_block=10)
+    main(num_cifer_blocks=6, num_hand_blocks_per_cifer_block=10, num_hand_indices_per_block=1000)
