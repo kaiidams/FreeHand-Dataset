@@ -133,3 +133,6 @@ dmypy.json
 
 # Local
 /data/
+/cifar-10-batches-py/
+/freehand-batches-py/
+/freehand-ext-batches-py/

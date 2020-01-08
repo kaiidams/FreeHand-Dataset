@@ -10,8 +10,6 @@ import pickle
 import json
 
 
-OUTPUT_DIR = 'freehand-batches-py'
-
 def read_cifer(block):
     if block == 6:
         filename = 'test_batch'
@@ -21,14 +19,17 @@ def read_cifer(block):
         return pickle.load(f, encoding='bytes')
 
 
-def write_freehand_data(block, data):
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
+def write_freehand_data(block, data, output_dir):
+    """the data is for test when block % 6 == 0"""
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     if block == 6:
         filename = 'test_batch'
+    elif block % 6 == 0:
+        filename = 'test_batch_{}'.format(block // 6)
     else:
-        filename = 'data_batch_{}'.format(block)
-    with open(OUTPUT_DIR + '/' + filename, 'wb') as f:
+        filename = 'data_batch_{}'.format(block - block // 6)
+    with open(os.path.join(output_dir, filename), 'wb') as f:
         return pickle.dump(data, f)
 
 
@@ -80,7 +81,7 @@ def image_to_array(im):
     return np.asarray(im).astype(np.uint8).transpose((2, 0, 1)).reshape((-1,))
 
 
-def make_image(cifer_data, cifer_index, annotations, hand_block, hand_index):
+def make_image(cifer_data, cifer_index, annotations, hand_block, hand_index, transpose_method=None):
     im = array_to_image(cifer_data[b'data'][cifer_index]).convert(mode='RGBA')
     anno = annotations[hand_index]
     hand_filepath = os.path.join('data', 'images', '{:02d}'.format(hand_block), anno['file_name'])
@@ -88,40 +89,81 @@ def make_image(cifer_data, cifer_index, annotations, hand_block, hand_index):
     bbox = get_crop_bbox(anno['bbox'], handim.width, handim.height)
     handim = handim.crop(bbox)
     handim = handim.resize((im.width, im.height), Image.BILINEAR)
+    if transpose_method is not None:
+        handim = handim.transpose(transpose_method)
     im.alpha_composite(handim)
     im = im.convert('RGB')
     return image_to_array(im)
 
 
-def write_readme():
+def combine_cifer_block(cifer_data, cifer_block, hand_block_start, num_hand_blocks_per_cifer_block, num_hand_indices_per_block, transpose_method=None):
+    labels = []
+    for i in range(num_hand_blocks_per_cifer_block):
+        hand_block = hand_block_start + i
+        print('cifer_block={}, hand_block={}'.format(cifer_block, hand_block))
+        annotations = read_hand_annotations(hand_block)
+        for hand_index in range(num_hand_indices_per_block):
+            cifer_index = i * num_hand_indices_per_block + hand_index
+            arr = make_image(cifer_data, cifer_index, annotations, hand_block, hand_index, transpose_method)
+            cifer_data[b'data'][cifer_index] = arr
+            anno = annotations[hand_index]
+            labels.append(anno['pose'])
+    labels = np.array(labels, dtype=np.float)
+    cifer_data[b'labels'] = labels
+    cifer_data[b'filenames'] = []
+
+
+def write_readme(output_dir):
     s = '<meta HTTP-EQUIV="REFRESH" content="0; url=https://github.com/kaiidams/FreeHand-Dataset">'
-    with open(os.path.join(OUTPUT_DIR, 'readme.html'), 'w') as f:
+    with open(os.path.join(output_dir, 'readme.html'), 'w') as f:
         f.write(s + '\n')
 
 
-def main(num_cifer_blocks=6, num_hand_blocks_per_cifer_block=10, num_hand_indices_per_block=1000):
+def main(num_cifer_blocks=6, num_hand_blocks_per_cifer_block=10, num_hand_indices_per_block=1000, output_dir='freehand-batches-py'):
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     for i in range(num_cifer_blocks):
         cifer_block = i + 1
         cifer_data = read_cifer(cifer_block)
-        labels = []
-        for j in range(num_hand_blocks_per_cifer_block):
-            hand_block = i * num_hand_blocks_per_cifer_block + j
-            print('cifer_block={}, hand_block={}'.format(cifer_block, hand_block))
-            annotations = read_hand_annotations(hand_block)
-            for hand_index in range(num_hand_indices_per_block):
-                cifer_index = j * num_hand_indices_per_block + hand_index
-                arr = make_image(cifer_data, cifer_index, annotations, hand_block, hand_index)
-                cifer_data[b'data'][cifer_index] = arr
-                anno = annotations[hand_index]
-                labels.append(anno['pose'])
-        labels = np.array(labels, dtype=np.float)
-        cifer_data[b'labels'] = labels
-        cifer_data[b'filenames'] = []
-        write_freehand_data(cifer_block, cifer_data)
-    write_readme()
+        hand_block_start = i * num_hand_blocks_per_cifer_block
+        combine_cifer_block(cifer_data, cifer_block, hand_block_start, num_hand_blocks_per_cifer_block, num_hand_indices_per_block)
+        write_freehand_data(cifer_block, cifer_data, output_dir)
+    write_readme(output_dir)
+
+
+def main2(num_cifer_blocks=6, num_hand_blocks_per_cifer_block=10, num_hand_indices_per_block=1000, extmode=1, output_dir='freehand-ext-batches-py'):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    if extmode == 1:
+        transpose_methods = [
+            Image.FLIP_LEFT_RIGHT
+        ]
+    elif extmode == 2:
+        transpose_methods = [
+            Image.FLIP_TOP_BOTTOM,
+            Image.ROTATE_90, Image.ROTATE_180, Image.ROTATE_270
+        ]
+
+    for i in range(len(transpose_methods)):
+        transpose_method = transpose_methods[i]
+        for j in range(num_cifer_blocks):
+            cifer_block = j + 1
+            out_cifer_block = (i + 1) * num_cifer_blocks + (j + 1)
+            cifer_data = read_cifer(cifer_block)
+            if cifer_block == num_cifer_blocks: # This is test set.
+                hand_block_start = j * num_hand_blocks_per_cifer_block
+            else:
+                k = (i + 1 + j) % (num_cifer_blocks - 1)
+                hand_block_start = k * num_hand_blocks_per_cifer_block
+            combine_cifer_block(cifer_data, cifer_block, hand_block_start, num_hand_blocks_per_cifer_block, num_hand_indices_per_block, transpose_method)
+            write_freehand_data(out_cifer_block, cifer_data, output_dir)
+    write_readme(output_dir)
 
 
 if __name__ == '__main__':
     #main(num_cifer_blocks=2, num_hand_blocks_per_cifer_block=1, num_hand_indices_per_block=10)
-    main(num_cifer_blocks=6, num_hand_blocks_per_cifer_block=10, num_hand_indices_per_block=1000)
+    #main(num_cifer_blocks=6, num_hand_blocks_per_cifer_block=10, num_hand_indices_per_block=1000)
+    main2()
