@@ -19,3 +19,8 @@ images.
 ```s
 $ blender hand.blend --background --python render_batch.py -- --test
 ```
+
+## 3D model
+
+The 3D model and texture image for the hand was created with
+[MakeHuman 1.1.1](http://www.makehumancommunity.org/).
